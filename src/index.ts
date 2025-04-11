@@ -506,7 +506,7 @@ async function main() {
 
                 case "delete_email": {
                     const validatedArgs = DeleteEmailSchema.parse(args);
-                    await gmail.users.messages.delete({
+                    await gmail.users.messages.trash({
                         userId: 'me',
                         id: validatedArgs.messageId,
                     });
@@ -515,7 +515,7 @@ async function main() {
                         content: [
                             {
                                 type: "text",
-                                text: `Email ${validatedArgs.messageId} deleted successfully`,
+                                text: `Email ${validatedArgs.messageId} moved to trash successfully`,
                             },
                         ],
                     };
@@ -610,7 +610,7 @@ async function main() {
                         async (batch) => {
                             const results = await Promise.all(
                                 batch.map(async (messageId) => {
-                                    await gmail.users.messages.delete({
+                                    await gmail.users.messages.trash({
                                         userId: 'me',
                                         id: messageId,
                                     });
@@ -625,11 +625,11 @@ async function main() {
                     const successCount = successes.length;
                     const failureCount = failures.length;
                     
-                    let resultText = `Batch delete operation complete.\n`;
-                    resultText += `Successfully deleted: ${successCount} messages\n`;
+                    let resultText = `Batch trash operation complete.\n`;
+                    resultText += `Successfully moved to trash: ${successCount} messages\n`;
                     
                     if (failureCount > 0) {
-                        resultText += `Failed to delete: ${failureCount} messages\n\n`;
+                        resultText += `Failed to move to trash: ${failureCount} messages\n\n`;
                         resultText += `Failed message IDs:\n`;
                         resultText += failures.map(f => `- ${(f.item as string).substring(0, 16)}... (${f.error.message})`).join('\n');
                     }
