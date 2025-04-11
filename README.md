@@ -1,6 +1,6 @@
 # Gmail MCP Server
 
-A Model Context Protocol (MCP) server for Gmail integration that enables AI assistants to manage Gmail through natural language interactions. This server provides a comprehensive set of tools for email management, label organization, and batch operations. Based off of [GongRzhe/Gmail-MCP-Server](https://github.com/GongRzhe/Gmail-MCP-Server).
+A Model Context Protocol (MCP) server for Gmail integration that enables AI assistants to manage Gmail through natural language interactions. This server provides a comprehensive set of tools for email management, label organization, and batch operations. Based off of [GongRzhe/Gmail-MCP-Server](https://github.com/GongRzhe/Gmail-MCP-Server). This is an MCP thatt allows agents to authenticate on a per call basis.
 
 ## Features
 
