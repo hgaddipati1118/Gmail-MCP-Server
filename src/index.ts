@@ -18,8 +18,12 @@ import open from 'open';
 import os from 'os';
 import {createEmailMessage} from "./utl.js";
 import { createLabel, updateLabel, deleteLabel, listLabels, findLabelByName, getOrCreateLabel, GmailLabel } from "./label-manager.js";
+import { config } from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load environment variables
+config();
 
 // Configuration paths
 const CONFIG_DIR = path.join(os.homedir(), '.gmail-mcp');
@@ -133,7 +137,13 @@ async function loadCredentials() {
         );
 
         if (fs.existsSync(CREDENTIALS_PATH)) {
-            const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
+            const credentials = {
+                access_token: process.env.GMAIL_ACCESS_TOKEN,
+                refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+                scope: process.env.GMAIL_SCOPE,
+                token_type: process.env.GMAIL_TOKEN_TYPE,
+                expiry_date: parseInt(process.env.GMAIL_EXPIRY_DATE || '0')
+            };
             oauth2Client.setCredentials(credentials);
         }
     } catch (error) {
