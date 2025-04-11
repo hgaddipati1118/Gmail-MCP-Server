@@ -137,13 +137,7 @@ async function loadCredentials() {
         );
 
         if (fs.existsSync(CREDENTIALS_PATH)) {
-            const credentials = {
-                access_token: process.env.GMAIL_ACCESS_TOKEN,
-                refresh_token: process.env.GMAIL_REFRESH_TOKEN,
-                scope: process.env.GMAIL_SCOPE,
-                token_type: process.env.GMAIL_TOKEN_TYPE,
-                expiry_date: parseInt(process.env.GMAIL_EXPIRY_DATE || '0')
-            };
+            const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
             oauth2Client.setCredentials(credentials);
         }
     } catch (error) {
