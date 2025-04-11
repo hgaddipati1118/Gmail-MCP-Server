@@ -2,6 +2,8 @@
  * Type definitions for Gmail MCP Server
  */
 
+import { gmail_v1 } from 'googleapis';
+
 // Gmail API types
 export interface GmailMessagePart {
     partId?: string;
@@ -31,29 +33,10 @@ export interface EmailContent {
     html: string;
 }
 
-export interface GmailAPI {
-    context: {
-        _options: {
-            auth: any;
-        };
-    };
-    users: {
-        labels: {
-            create: (params: any) => Promise<any>;
-            update: (params: any) => Promise<any>;
-            delete: (params: any) => Promise<any>;
-            get: (params: any) => Promise<any>;
-            list: (params: any) => Promise<any>;
-        };
-        messages: {
-            send: (params: any) => Promise<any>;
-            get: (params: any) => Promise<any>;
-            modify: (params: any) => Promise<any>;
-            delete: (params: any) => Promise<any>;
-            list: (params: any) => Promise<any>;
-        };
-    };
-}
+export type GmailAPI = gmail_v1.Gmail;
+
+// Update GmailLabel to match Schema$Label from googleapis
+export type GmailLabel = gmail_v1.Schema$Label;
 
 export interface EmailMessageArgs {
     access_token: string;

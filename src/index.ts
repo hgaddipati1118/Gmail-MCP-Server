@@ -13,7 +13,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { createEmailMessage } from "./utils.js";
 import { createLabel, updateLabel, deleteLabel, listLabels, findLabelByName, getOrCreateLabel, GmailLabel } from "./label-manager.js";
 import { config } from 'dotenv';
-import { GmailAPI, EmailMessageArgs, GmailMessagePart, EmailContent } from './types.js';
+import { GmailAPI, EmailMessageArgs, GmailMessagePart, EmailContent, EmailAttachment } from './types.js';
 
 // Load environment variables
 config();
