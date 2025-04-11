@@ -10,54 +10,13 @@ import { google } from 'googleapis';
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { OAuth2Client } from 'google-auth-library';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import http from 'http';
-import open from 'open';
-import os from 'os';
-import {createEmailMessage} from "./utl.js";
+import { createEmailMessage } from "./utils.js";
 import { createLabel, updateLabel, deleteLabel, listLabels, findLabelByName, getOrCreateLabel, GmailLabel } from "./label-manager.js";
 import { config } from 'dotenv';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { GmailAPI, EmailMessageArgs, GmailMessagePart, EmailContent } from './types.js';
 
 // Load environment variables
 config();
-
-// Configuration paths
-const CONFIG_DIR = path.join(os.homedir(), '.gmail-mcp');
-const OAUTH_PATH = process.env.GMAIL_OAUTH_PATH || path.join(CONFIG_DIR, 'gcp-oauth.keys.json');
-const CREDENTIALS_PATH = process.env.GMAIL_CREDENTIALS_PATH || path.join(CONFIG_DIR, 'credentials.json');
-
-// Type definitions for Gmail API responses
-interface GmailMessagePart {
-    partId?: string;
-    mimeType?: string;
-    filename?: string;
-    headers?: Array<{
-        name: string;
-        value: string;
-    }>;
-    body?: {
-        attachmentId?: string;
-        size?: number;
-        data?: string;
-    };
-    parts?: GmailMessagePart[];
-}
-
-interface EmailAttachment {
-    id: string;
-    filename: string;
-    mimeType: string;
-    size: number;
-}
-
-interface EmailContent {
-    text: string;
-    html: string;
-}
 
 // OAuth2 configuration
 let oauth2Client: OAuth2Client;
@@ -96,102 +55,36 @@ function extractEmailContent(messagePart: GmailMessagePart): EmailContent {
     return { text: textContent, html: htmlContent };
 }
 
-async function loadCredentials() {
+async function loadCredentials(access_token: string) {
     try {
-        // Create config directory if it doesn't exist
-        if (!fs.existsSync(CONFIG_DIR)) {
-            fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        // Use the provided access token
+        if (access_token) {
+            // Initialize OAuth2 client with the provided token
+            oauth2Client = new OAuth2Client();
+            oauth2Client.setCredentials({
+                access_token: access_token,
+                scope: 'https://www.googleapis.com/auth/gmail.modify'
+            });
+            return;
         }
-
-        // Check for OAuth keys in current directory first, then in config directory
-        const localOAuthPath = path.join(process.cwd(), 'gcp-oauth.keys.json');
-        let oauthPath = OAUTH_PATH;
-
-        if (fs.existsSync(localOAuthPath)) {
-            // If found in current directory, copy to config directory
-            fs.copyFileSync(localOAuthPath, OAUTH_PATH);
-            console.log('OAuth keys found in current directory, copied to global config.');
-        }
-
-        if (!fs.existsSync(OAUTH_PATH)) {
-            console.error('Error: OAuth keys file not found. Please place gcp-oauth.keys.json in current directory or', CONFIG_DIR);
-            process.exit(1);
-        }
-
-        const keysContent = JSON.parse(fs.readFileSync(OAUTH_PATH, 'utf8'));
-        const keys = keysContent.installed || keysContent.web;
-
-        if (!keys) {
-            console.error('Error: Invalid OAuth keys file format. File should contain either "installed" or "web" credentials.');
-            process.exit(1);
-        }
-
-        const callback = process.argv[2] === 'auth' && process.argv[3] 
-        ? process.argv[3] 
-        : "http://localhost:3000/oauth2callback";
-
-        oauth2Client = new OAuth2Client(
-            keys.client_id,
-            keys.client_secret,
-            callback
-        );
-
-        if (fs.existsSync(CREDENTIALS_PATH)) {
-            const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
-            oauth2Client.setCredentials(credentials);
-        }
-    } catch (error) {
+        // If no valid token provided, throw error
+        throw new Error('No valid authentication token provided. Please provide an access token.');
+    }
+    catch (error) {
         console.error('Error loading credentials:', error);
-        process.exit(1);
+        throw error; // Re-throw to be handled by the caller
     }
 }
 
-async function authenticate() {
-    const server = http.createServer();
-    server.listen(3000);
-
-    return new Promise<void>((resolve, reject) => {
-        const authUrl = oauth2Client.generateAuthUrl({
-            access_type: 'offline',
-            scope: ['https://www.googleapis.com/auth/gmail.modify'],
-        });
-
-        console.log('Please visit this URL to authenticate:', authUrl);
-        open(authUrl);
-
-        server.on('request', async (req, res) => {
-            if (!req.url?.startsWith('/oauth2callback')) return;
-
-            const url = new URL(req.url, 'http://localhost:3000');
-            const code = url.searchParams.get('code');
-
-            if (!code) {
-                res.writeHead(400);
-                res.end('No code provided');
-                reject(new Error('No code provided'));
-                return;
-            }
-
-            try {
-                const { tokens } = await oauth2Client.getToken(code);
-                oauth2Client.setCredentials(tokens);
-                fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(tokens));
-
-                res.writeHead(200);
-                res.end('Authentication successful! You can close this window.');
-                server.close();
-                resolve();
-            } catch (error) {
-                res.writeHead(500);
-                res.end('Authentication failed');
-                reject(error);
-            }
-        });
-    });
+// Helper function to initialize Gmail API with access token
+async function initializeGmailAPI(access_token: string): Promise<GmailAPI> {
+    await loadCredentials(access_token);
+    return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
 // Schema definitions
 const SendEmailSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     to: z.array(z.string()).describe("List of recipient email addresses"),
     subject: z.string().describe("Email subject"),
     body: z.string().describe("Email body content"),
@@ -202,16 +95,18 @@ const SendEmailSchema = z.object({
 });
 
 const ReadEmailSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     messageId: z.string().describe("ID of the email message to retrieve"),
 });
 
 const SearchEmailsSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     query: z.string().describe("Gmail search query (e.g., 'from:example@gmail.com')"),
     maxResults: z.number().optional().describe("Maximum number of results to return"),
 });
 
-// Updated schema to include removeLabelIds
 const ModifyEmailSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     messageId: z.string().describe("ID of the email message to modify"),
     labelIds: z.array(z.string()).optional().describe("List of label IDs to apply"),
     addLabelIds: z.array(z.string()).optional().describe("List of label IDs to add to the message"),
@@ -219,20 +114,23 @@ const ModifyEmailSchema = z.object({
 });
 
 const DeleteEmailSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     messageId: z.string().describe("ID of the email message to delete"),
 });
 
-// New schema for listing email labels
-const ListEmailLabelsSchema = z.object({}).describe("Retrieves all available Gmail labels");
+const ListEmailLabelsSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
+}).describe("Retrieves all available Gmail labels");
 
-// Label management schemas
 const CreateLabelSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     name: z.string().describe("Name for the new label"),
     messageListVisibility: z.enum(['show', 'hide']).optional().describe("Whether to show or hide the label in the message list"),
     labelListVisibility: z.enum(['labelShow', 'labelShowIfUnread', 'labelHide']).optional().describe("Visibility of the label in the label list"),
 }).describe("Creates a new Gmail label");
 
 const UpdateLabelSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     id: z.string().describe("ID of the label to update"),
     name: z.string().optional().describe("New name for the label"),
     messageListVisibility: z.enum(['show', 'hide']).optional().describe("Whether to show or hide the label in the message list"),
@@ -240,17 +138,19 @@ const UpdateLabelSchema = z.object({
 }).describe("Updates an existing Gmail label");
 
 const DeleteLabelSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     id: z.string().describe("ID of the label to delete"),
 }).describe("Deletes a Gmail label");
 
 const GetOrCreateLabelSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     name: z.string().describe("Name of the label to get or create"),
     messageListVisibility: z.enum(['show', 'hide']).optional().describe("Whether to show or hide the label in the message list"),
     labelListVisibility: z.enum(['labelShow', 'labelShowIfUnread', 'labelHide']).optional().describe("Visibility of the label in the label list"),
 }).describe("Gets an existing label by name or creates it if it doesn't exist");
 
-// Schemas for batch operations
 const BatchModifyEmailsSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     messageIds: z.array(z.string()).describe("List of message IDs to modify"),
     addLabelIds: z.array(z.string()).optional().describe("List of label IDs to add to all messages"),
     removeLabelIds: z.array(z.string()).optional().describe("List of label IDs to remove from all messages"),
@@ -258,24 +158,14 @@ const BatchModifyEmailsSchema = z.object({
 });
 
 const BatchDeleteEmailsSchema = z.object({
+    access_token: z.string().describe("Access token for Gmail API"),
     messageIds: z.array(z.string()).describe("List of message IDs to delete"),
     batchSize: z.number().optional().default(50).describe("Number of messages to process in each batch (default: 50)"),
 });
 
 // Main function
 async function main() {
-    await loadCredentials();
-
-    if (process.argv[2] === 'auth') {
-        await authenticate();
-        console.log('Authentication completed successfully');
-        process.exit(0);
-    }
-
-    // Initialize Gmail API
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
-    // Server implementation
+    // Initialize server
     const server = new Server({
         name: "gmail",
         version: "1.0.0",
@@ -329,7 +219,7 @@ async function main() {
             },
             {
                 name: "batch_delete_emails",
-                description: "Permanently deletes multiple emails in batches",
+                description: "Deletes multiple emails in batches",
                 inputSchema: zodToJsonSchema(BatchDeleteEmailsSchema),
             },
             {
@@ -353,10 +243,33 @@ async function main() {
                 inputSchema: zodToJsonSchema(GetOrCreateLabelSchema),
             },
         ],
-    }))
+    }));
 
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
+        
+        // Initialize Gmail API with the access token from the request
+        let gmail: ReturnType<typeof google.gmail>;
+        try {
+            // Extract access token from the arguments
+            const access_token = args?.access_token;
+            if (!access_token || typeof access_token !== 'string') {
+                throw new Error('Access token is required for all operations');
+            }
+            
+            // Initialize Gmail API with the provided access token
+            gmail = await initializeGmailAPI(access_token);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Authentication error: ${errorMessage}`,
+                    },
+                ],
+            };
+        }
 
         async function handleEmailAction(action: "send" | "draft", validatedArgs: any) {
             const message = createEmailMessage(validatedArgs);

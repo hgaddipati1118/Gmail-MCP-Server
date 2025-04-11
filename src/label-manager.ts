@@ -2,6 +2,7 @@
  * Label Manager for Gmail MCP Server
  * Provides comprehensive label management functionality
  */
+import { GmailAPI } from './types.js';
 
 // Type definitions for Gmail API labels
 export interface GmailLabel {
@@ -18,6 +19,11 @@ export interface GmailLabel {
     };
 }
 
+export interface LabelOptions {
+    messageListVisibility?: 'show' | 'hide';
+    labelListVisibility?: 'labelShow' | 'labelShowIfUnread' | 'labelHide';
+}
+
 /**
  * Creates a new Gmail label
  * @param gmail - Gmail API instance
@@ -25,10 +31,7 @@ export interface GmailLabel {
  * @param options - Optional settings for the label
  * @returns The newly created label
  */
-export async function createLabel(gmail: any, labelName: string, options: {
-    messageListVisibility?: string;
-    labelListVisibility?: string;
-} = {}) {
+export async function createLabel(gmail: GmailAPI, labelName: string, options: LabelOptions = {}) {
     try {
         // Default visibility settings if not provided
         const messageListVisibility = options.messageListVisibility || 'show';
@@ -61,11 +64,7 @@ export async function createLabel(gmail: any, labelName: string, options: {
  * @param updates - Properties to update
  * @returns The updated label
  */
-export async function updateLabel(gmail: any, labelId: string, updates: {
-    name?: string;
-    messageListVisibility?: string;
-    labelListVisibility?: string;
-}) {
+export async function updateLabel(gmail: GmailAPI, labelId: string, updates: LabelOptions & { name?: string }) {
     try {
         // Verify the label exists before updating
         await gmail.users.labels.get({
@@ -95,7 +94,7 @@ export async function updateLabel(gmail: any, labelId: string, updates: {
  * @param labelId - ID of the label to delete
  * @returns Success message
  */
-export async function deleteLabel(gmail: any, labelId: string) {
+export async function deleteLabel(gmail: GmailAPI, labelId: string) {
     try {
         // Ensure we're not trying to delete system labels
         const label = await gmail.users.labels.get({
@@ -127,7 +126,7 @@ export async function deleteLabel(gmail: any, labelId: string) {
  * @param gmail - Gmail API instance
  * @returns Object containing system and user labels
  */
-export async function listLabels(gmail: any) {
+export async function listLabels(gmail: GmailAPI) {
     try {
         const response = await gmail.users.labels.list({
             userId: 'me',
@@ -136,8 +135,8 @@ export async function listLabels(gmail: any) {
         const labels = response.data.labels || [];
         
         // Group labels by type for better organization
-        const systemLabels = labels.filter((label:GmailLabel) => label.type === 'system');
-        const userLabels = labels.filter((label:GmailLabel) => label.type === 'user');
+        const systemLabels = labels.filter((label: GmailLabel) => label.type === 'system');
+        const userLabels = labels.filter((label: GmailLabel) => label.type === 'user');
 
         return {
             all: labels,
@@ -160,7 +159,7 @@ export async function listLabels(gmail: any) {
  * @param labelName - Name of the label to find
  * @returns The found label or null if not found
  */
-export async function findLabelByName(gmail: any, labelName: string) {
+export async function findLabelByName(gmail: GmailAPI, labelName: string) {
     try {
         const labelsResponse = await listLabels(gmail);
         const allLabels = labelsResponse.all;
@@ -183,10 +182,7 @@ export async function findLabelByName(gmail: any, labelName: string) {
  * @param options - Optional settings for the label
  * @returns The new or existing label
  */
-export async function getOrCreateLabel(gmail: any, labelName: string, options: {
-    messageListVisibility?: string;
-    labelListVisibility?: string;
-} = {}) {
+export async function getOrCreateLabel(gmail: GmailAPI, labelName: string, options: LabelOptions = {}) {
     try {
         // First try to find an existing label
         const existingLabel = await findLabelByName(gmail, labelName);
