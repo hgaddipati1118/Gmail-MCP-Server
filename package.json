@@ -1,7 +1,7 @@
 {
   "name": "@hgaddipati1118/server-gmail-mcp",
-  "version": "1.2.0",
-  "description": "Gmail MCP server with per-call authentication",
+  "version": "1.0.0",
+  "description": "Gmail MCP server with per-call authentication based off GongRzhe/Gmail-MCP-Server ",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -31,12 +31,12 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gongrzhe/server-gmail-mcp.git"
+    "url": "git+https://github.com/hgaddipati1118/Gmail-MCP-Server.git"
   },
   "bugs": {
-    "url": "https://github.com/gongrzhe/server-gmail-mcp/issues"
+    "url": "https://github.com/hgaddipati1118/Gmail-MCP-Server/issues"
   },
-  "homepage": "https://github.com/gongrzhe/server-gmail-mcp#readme",
+  "homepage": "https://github.com/hgaddipati1118/Gmail-MCP-Server#readme",
   "publishConfig": {
     "access": "public"
   },
